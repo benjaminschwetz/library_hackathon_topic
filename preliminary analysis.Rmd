@@ -1,0 +1,137 @@
+---
+title: "Literature analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Search queries:
+
+
+I did two searches
+
+1) `trichoderma reseei` in the document title
+2)  `trichoderma` in title, abstract, keywords, combined with any of the following:
+  - industrial
+  - industry
+  - biotechn*
+  - baking
+  - ( cellulos*  W/5  ethanol )
+  - lysozyme
+
+
+```{r libs, include=FALSE}
+library(tidyverse)
+library(bib2df)
+```
+
+```{r include=FALSE}
+files = dir("", pattern = ".bib", full.names = TRUE)
+df_bib <- map_df(files, 
+                 bib2df) %>% 
+  distinct()
+```
+
+```{r}
+conversion_cols <- list( 
+  "AU" = "AUTHOR",
+  "TI" = "TITLE",
+  "SO" = "JOURNAL",
+  #"JI" = "ISO Source Abbreviation",
+  "DT" = "CATEGORY",
+  "DE" = "AUTHOR_KEYWORDS",
+  "ID" = "KEYWORDS",
+  "AB" = "ABSTRACT",
+  "C1" = "ADDRESS",
+  #"RP" = "Reprint Address",
+  #"CR" = "Cited References",
+  "TC" = "TIMES_CITED",
+  "PY" = "YEAR",
+  "UT" = "URL",
+  "DB" = "SOURCE"
+)
+```
+
+```{r}
+
+df_m <- map_df(
+  files,
+  ~readFiles(.x) %>% 
+  convert2df(dbsource = "scopus", format = "bibtex")
+)
+df_m <- df_m %>% distinct()
+
+```
+
+
+This gave a total of `r count(df_m)[[1]]`
+
+```{r}
+df_auth <- bibliometrix::authorProdOverTime(df_m, graph = FALSE)
+```
+```{r}
+df_auth$graph +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+sample_struc <- bibliometrix::conceptualStructure(
+  sample_n(df_m, 300), 
+  graph = FALSE
+  )
+```
+
+```{r}
+plot <- sample_struc$graph_terms
+new_data <-  sample_n(plot$data %>% group_by(cluster), 15)
+new_data$name <- factor(new_data$name)
+new_plot <- plot %+%  new_data
+new_plot
+```
+
+```{r}
+ggplot(new_data)+
+  geom_text(aes(x, y, color = cluster, label = name), check_overlap = TRUE)+
+  ggtitle("Cluster analysis of documents",
+          "based on keywords")
+```
+
+```{r}
+sample_struc$graph_dendogram
+```
+```{r}
+sample_struc$graph_documents_TC
+```
+```{r}
+sample_struc$graph_documents_Contrib
+```
+
+```{r}
+sample_struc$res
+```
+
+```{r}
+sample_struc$res$var$contrib %>% head()
+```
+```{r}
+network_auth <- bibliometrix::biblioNetwork(sample_n(df_m, 300))
+```
+
+```{r}
+NetMatrix <- biblioNetwork(sample_n(df_m, 300), analysis = "collaboration", network = "authors", sep = ";")
+
+net <- networkPlot(NetMatrix, n = 30, type = "kamada", Title = "Collaboration",labelsize=0.5)
+```
+
+```{r}
+
+NetMatrix <- biblioNetwork(sample_n(df_m, 1000), analysis = "co-citation", network = "references", sep = ";")
+
+```
+
+```{r}
+df-bi
+```
+
