@@ -14,14 +14,25 @@ library(tidylog)
 
 
 ```{r}
-df <- bib2df("data.bib")
+df <- europepmc::epmc_search("biofilm", "raw", limit = 3000)
+```
+```{r}
+df <- df %>% map(
+  ~discard(.x, ~is.list(.x))
+        ) %>% 
+  map_df(bind_rows)
+```
+
+Alternative
+```{r}
+# df <- bib2df("data.bib")
 ```
 
 Generating dtm and fitting the model
 ```{r}
 dtm_better <- CreateDtm(
-  df$ABSTRACT,
-  df$URL,
+  df$abstractText,
+  df$id,
   ngram_window = c(1,3),
   stopword_vec = c(stopwords::stopwords("en"), # stopwords from tm
                    stopwords::stopwords(source = "smart"),
