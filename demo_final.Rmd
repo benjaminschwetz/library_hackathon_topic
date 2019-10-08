@@ -106,6 +106,46 @@ gg_x <- ggraph(g_tidy, layout = 'fr') +
 gg_x
 ```
 
+```{r}
+textmineR::SummarizeTopics(model)
+```
+
+```{r}
+assignments <- model$theta %>%
+  as_tibble(rownames = "doc")
+```
+
+```{r}
+assignments_long <- assignments %>% pivot_longer(-doc) 
+```
+
+```{r}
+assignments_long %>% 
+  ggplot()+
+  aes(name, value)+
+  geom_boxplot()
+```
+
+It's a bit suspicious how evenly spaced things are
 
 
+```{r}
+assignments_long %>% 
+  arrange(doc) %>% 
+  head(10)
+```
+
+
+```{r}
+assignments_top <- assignments_long %>% 
+  mutate(value = round(value, digits = 1)) %>% 
+  filter(value > 0)
+```
+
+```{r}
+assignments_long %>% 
+  ggplot()+
+  aes(name, value)+
+  geom_violin()
+```
 
