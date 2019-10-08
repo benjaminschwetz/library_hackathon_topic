@@ -1,0 +1,111 @@
+---
+title: "Building a thematic map using textmineR"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+library(textmineR)
+library(bib2df)
+library(tidylog)
+```
+
+
+```{r}
+df <- bib2df("data.bib")
+```
+
+Generating dtm and fitting the model
+```{r}
+dtm_better <- CreateDtm(
+  df$ABSTRACT,
+  df$URL,
+  ngram_window = c(1,3),
+  stopword_vec = c(stopwords::stopwords("en"), # stopwords from tm
+                   stopwords::stopwords(source = "smart"),
+                   c("î", "â", "ml")), # this is the default value
+  lower = TRUE, # lowercase - this is the default value
+  remove_punctuation = TRUE, # punctuation - this is the default
+  remove_numbers = TRUE, # numbers - this is the default
+  verbose = FALSE, # Turn off status bar for this demo
+  cpus = 2
+)
+model <- FitLdaModel(dtm = dtm_better, 
+                     k = 10,
+                     iterations = 200, # I usually recommend at least 500 iterations or more
+                     burnin = 180,
+                     alpha = 0.1,
+                     beta = 0.05,
+                     optimize_alpha = TRUE,
+                     calc_likelihood = TRUE,
+                     calc_coherence = TRUE,
+                     calc_r2 = TRUE,
+                     cpus = 2) 
+```
+
+
+Extracting metrics
+
+```{r}
+model$top_terms <- GetTopTerms(phi = model$phi, M = 5)
+model$prevalence <- colSums(model$theta) / sum(model$theta) * 100
+model$labels <- LabelTopics(assignments = model$theta > 0.05, 
+                            dtm = dtm_better,
+                            M = 2)
+model$summary <- data.frame(topic = rownames(model$phi),
+                            label = model$labels,
+                            coherence = round(model$coherence, 3),
+                            prevalence = round(model$prevalence,3),
+                            top_terms = apply(model$top_terms, 2, function(x){
+                              paste(x, collapse = ", ")
+                            }),
+                            stringsAsFactors = FALSE)
+```
+
+
+Wrangling the results
+```{r}
+df_sum <- model$summary[ order(model$summary$prevalence, decreasing = TRUE) , ][ 1:10 , ]
+df_sum <- df_sum %>% 
+  unite(label,starts_with("label."), sep = " / ")
+df_clean <- df_sum %>%  
+  mutate(term = str_split(top_terms, ", ")) %>% 
+  unnest(term) %>% 
+  distinct() %>% 
+  select(-topic, -top_terms)
+topics <- unique(df_clean$label) #finding unique topic names
+df_edges <- df_clean %>% 
+  select(label, term)
+```
+
+Converting to graph using tidygraph
+```{r}
+library(tidygraph)
+g_tidy <- as_tbl_graph(df_edges) %>% 
+  activate(nodes) %>% 
+  mutate(category = case_when(
+    name %in% topics ~ "topic",
+    TRUE ~ "terms"
+  )
+  )
+```
+
+
+Using ggraph to plot the result. 
+
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE, out.width="100%"}
+library(ggraph)
+gg_x <- ggraph(g_tidy, layout = 'fr') + 
+  geom_edge_diagonal(show.legend = FALSE) + 
+  geom_node_label(aes(label = name, fill = category), repel = TRUE) +
+  scale_fill_brewer(type = "qual")+
+  theme_graph() + 
+  ggtitle("Thematic Map for OA-Papers on Biofilm in 2019")
+gg_x
+```
+
+
+
+
